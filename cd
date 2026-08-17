@@ -1,0 +1,17 @@
+function handle({
+	args
+}) {
+	if (args.length === 1) {
+		console.log("Please specify a directory to go to.");
+		return;
+	}
+	
+	try {
+		process.chdir(args[1]);
+	} catch (err) {
+		console.error(`Unable to go to ${path.join(import.meta.dirname, args[1])}:`);
+		throw err;
+	}
+}
+
+export default handle;
