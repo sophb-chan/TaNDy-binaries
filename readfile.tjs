@@ -1,0 +1,13 @@
+import * as fs from 'fs';
+
+function handle({
+	args,
+}) {
+	const targetPath = args[1];
+	const fileContent = fs.readFileSync(targetPath, { encoding: 'utf-8' });
+	console.log('[START]');
+	console.log(fileContent);
+	console.log('[END]');
+}
+
+export default handle;
