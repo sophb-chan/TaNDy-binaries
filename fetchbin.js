@@ -36,39 +36,46 @@ async function handle({
 	reloadBinaries,
 } = {}) {
 	if (args.length === 1) {
-		console.log("Usage: fetchbin <binary name>");
+		console.log("Usage: fetchbin <binary names>");
 		return;
 	}
 
 	const binPath = import.meta.dirname
-	const binaryName = args[1];
-	let binary, binaryFilename;
-	for (const [index, extension] of validBinExtensions.entries()) {
-		const filename = binaryName + extension;
-		const attemptDownload = async () => void (binary = await downloadBinary(filename));
+	const binaryNames = args.slice(1);
+	for (const binaryName of binaryNames) {
+		try {
+			console.log(`Installing '${binaryName}'...\n`);
+			let binary, binaryFilename;
+			for (const [index, extension] of validBinExtensions.entries()) {
+				const filename = binaryName + extension;
+				const attemptDownload = async () => void (binary = await downloadBinary(filename));
 
-		if (index === validBinExtensions.length - 1) attempt();
-		else {
-			try {
-				await attemptDownload();
-				binaryFilename = filename;
-				break;
-			} catch (err) {
-				// Ignore errors about missing binaries
-				if (err.message == null) continue;
-				const tests = [/^Binary "/];
-				if (!tests.every(test => test instanceof RegExp ? test.test(err.message) : err.message.includes(test))) throw err;
+				if (index === validBinExtensions.length - 1) await attemptDownload();
+				else {
+					try {
+						await attemptDownload();
+						binaryFilename = filename;
+						break;
+					} catch (err) {
+						// Ignore errors about missing binaries
+						if (err.message == null) continue;
+						const tests = [/^Binary "/];
+						if (!tests.every(test => test instanceof RegExp ? test.test(err.message) : err.message.includes(test))) throw err;
+					}
+				}
 			}
+
+			const targetPath = path.join(import.meta.dirname, binaryFilename);
+			console.log(`\nWriting to disk ("${targetPath}")...`);
+			fs.writeFileSync(targetPath, binary);
+
+			console.log(`\nInstalled "${binaryName}"!`);
+		} catch {
+			console.log(`Binary "${binaryName}" not found in ${sources.length > 1 ? 'all ' : ''}${sources.length} source${sources.length === 1 ? '' : 's'}.`);
 		}
 	}
-
-	const targetPath = path.join(import.meta.dirname, binaryFilename);
-	console.log(`\nWriting to disk ("${targetPath}")...`);
-	fs.writeFileSync(targetPath, binary);
 	console.log('Reloading binaries...');
 	reloadBinaries();
-
-	console.log(`\nInstalled "${binaryName}"!`);
 }
 
 export default handle;
