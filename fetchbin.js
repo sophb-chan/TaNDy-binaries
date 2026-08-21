@@ -7,7 +7,10 @@ const sources = [ // TODO: make this dynamic somehow
 
 async function downloadBinary(binary) {
 	for (const [index, source] of sources.entries()) {
-		const constructedURL = source.endsWith('/') ? source + binary : source + '/' + binary;
+		const constructedURL =
+			source.includes('<$BINARY>')
+				? source.replaceAll('<$BINARY>', binary)
+				: source.endsWith('/') ? source + binary : source + '/' + binary;
 		try {
 			const r = await fetch(constructedURL);
 			if (r.status !== 200)
@@ -39,7 +42,7 @@ async function handle({
 	const binPath = import.meta.dirname
 	const binaryName = args[1];
 	let binary, binaryFilename;
-	for (const [index, extension] of validBinExtensions.entries()) {
+s	for (const [index, extension] of validBinExtensions.entries()) {
 		const filename = binaryName + extension;
 		const attemptDownload = async () => void (binary = await downloadBinary(filename));
 

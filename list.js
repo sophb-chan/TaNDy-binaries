@@ -6,7 +6,9 @@ function handle({
 	flags
 } = {}) {
 	if (flags.modifiers.includes('h') || flags.modifiers.includes('help')) {
-		console.log("--help    (-h) - Shows this help\n");
+		console.log("Usage: list [target directory]\n");
+		console.log("=== Flags ===");
+		console.log("--help    (-h) - Shows this");
 		console.log("--file    (-F) - Only list files");
 		console.log("--dir     (-D) - Only list directories");
 		console.log("--symlink (-S) - Only list symbolic links");
@@ -15,13 +17,14 @@ function handle({
 
 
 	const dir = args[1] ?? '.';
+	console.log('Reading:', dir);
 	const list = fs.readdirSync(dir, { withFileTypes: true });
-	
+
 	const ESC = '\x1b';
 	for (const entry of list) {
 		if (entry.isFile()) {
 			if (flags.modifiers.includes('dir') || flags.modifiers.includes('D')) continue;
-			if (flags.modifiers.includes('symlink') || flags.modifiers.includes('S')) continue;			
+			if (flags.modifiers.includes('symlink') || flags.modifiers.includes('S')) continue;
 
 			// file
 			const fullPath = path.join(dir, entry.name);
