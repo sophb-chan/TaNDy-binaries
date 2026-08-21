@@ -33,6 +33,7 @@ async function downloadBinary(binary) {
 async function handle({
 	args,
 	validBinExtensions,
+	reloadBinaries,
 } = {}) {
 	if (args.length === 1) {
 		console.log("Usage: fetchbin <binary name>");
@@ -42,7 +43,7 @@ async function handle({
 	const binPath = import.meta.dirname
 	const binaryName = args[1];
 	let binary, binaryFilename;
-s	for (const [index, extension] of validBinExtensions.entries()) {
+	for (const [index, extension] of validBinExtensions.entries()) {
 		const filename = binaryName + extension;
 		const attemptDownload = async () => void (binary = await downloadBinary(filename));
 
@@ -64,6 +65,8 @@ s	for (const [index, extension] of validBinExtensions.entries()) {
 	const targetPath = path.join(import.meta.dirname, binaryFilename);
 	console.log(`\nWriting to disk ("${targetPath}")...`);
 	fs.writeFileSync(targetPath, binary);
+	console.log('Reloading binaries...');
+	reloadBinaries();
 
 	console.log(`\nInstalled "${binaryName}"!`);
 }
