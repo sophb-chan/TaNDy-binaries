@@ -34,13 +34,14 @@ async function handle({
 	args,
 	validBinExtensions,
 	reloadBinaries,
+	rlInterface,
+	binDir,
 } = {}) {
 	if (args.length === 1) {
 		console.log("Usage: fetchbin <binary names>");
 		return;
 	}
 
-	const binPath = import.meta.dirname
 	const binaryNames = args.slice(1);
 	for (const binaryName of binaryNames) {
 		try {
@@ -48,13 +49,16 @@ async function handle({
 			let binary, binaryFilename;
 			for (const [index, extension] of validBinExtensions.entries()) {
 				const filename = binaryName + extension;
-				const attemptDownload = async () => void (binary = await downloadBinary(filename));
+				const attemptDownload = async () => {
+					binary = await downloadBinary(filename);
+					binaryFilename = filename;
+					return binary;
+				}
 
 				if (index === validBinExtensions.length - 1) await attemptDownload();
 				else {
 					try {
 						await attemptDownload();
-						binaryFilename = filename;
 						break;
 					} catch (err) {
 						// Ignore errors about missing binaries
@@ -65,7 +69,27 @@ async function handle({
 				}
 			}
 
-			const targetPath = path.join(import.meta.dirname, binaryFilename);
+			for (const extension of validBinExtensions) {
+				const absPath = path.join(binDir, binaryName + extension);
+				if (fs.existsSync(absPath)) {
+					console.log(`\nThere already is a binary named "${binaryName}" installed in your system ("under ${absPath}").`);
+					const ask = async () => {
+						const answer = (await rlInterface.question(`Do you want to (I)gnore it, (D)elete it, or (S)top here? (Default: S) `)).toLowerCase() || 's';
+						if (!'ids'.includes(answer)) {
+							console.log('Invalid answer.\n');
+							return await ask();
+						}
+						return answer;
+					}
+					const answer = await ask();
+					if (answer === 'i') continue;
+					else if (answer === 'd') fs.rmSync(absPath);
+					else if (answer === 's') return;
+					else return; // Panic!
+				}
+			}
+
+			const targetPath = path.join(binDir, binaryFilename);
 			console.log(`\nWriting to disk ("${targetPath}")...`);
 			fs.writeFileSync(targetPath, binary);
 
