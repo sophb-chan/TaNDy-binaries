@@ -7,7 +7,9 @@ async function fetchFromRemote(filepath) {
 	return await r.text();
 }
 async function handle({
-	tandyDir
+	tandyDir,
+	flagsObj,
+	rlInterface,
 } = {}) {
 	// Conversion table between local and remote filenames
 	const nametable = {
@@ -31,8 +33,29 @@ async function handle({
 
 	// Update files that need to be updated
 	if (Object.values(needsUpdate).some(Boolean)) {
-		for (const [localName, updateNeeded] of Object.entries(needsUpdate)) {
-			if (!updateNeeded) continue;
+		console.log(flagsObj);
+		if (!(flagsObj.y || flagsObj['assume-yes'])) {
+			let updateStr = '';
+			const outdated = Object.entries(needsUpdate).filter(v => v[1]).map(v => v[0]);
+			for (const [index, pkg] of outdated.entries()) {
+				updateStr += pkg;
+				if (index === outdated.length - 1) updateStr += '';
+				else if (index === outdated.length - 2) updateStr += ' and ';
+				else updateStr += ', ';
+			}
+			const ask = async () => {
+				const answer = (await rlInterface.question(`${updateStr} need${outdated.length === 1 ? 's' : ''} to update. Proceed? [Y/n] `)).toLowerCase() || 'y';
+				if (!'yn'.includes(answer)) {
+					console.log('Invalid response.');
+					return await ask();
+				}
+				return answer;
+			};
+			const proceed = await ask() === 'y';
+			if (!proceed) return;
+		}
+		for (const [localName, isOutdated] of Object.entries(needsUpdate)) {
+			if (!isOutdated) continue;
 			console.log(`Updating '${localName}'...`);
 			const newContent = remoteContents[nametable[localName]];
 			fs.writeFileSync(path.join(tandyDir, localName), newContent);
