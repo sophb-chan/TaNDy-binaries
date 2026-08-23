@@ -2,7 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 async function fetchSources() {
-	const r = await fetch('https://raw.githubusercontent.com/sophb-chan/TaNDy-binaries/main/sources.json');
+	const r = await fetch('https://raw.githubusercontent.com/sophb-chan/TaNDy-binaries/main/sources.json?nocache=' + Math.random());
 	const text = await r.text();
 	const parsed = JSON.parse(text);
 	return parsed;
@@ -11,10 +11,12 @@ const sources = [];
 
 async function downloadBinary(binary) {
 	for (const [index, source] of sources.entries()) {
-		const constructedURL =
-			source.includes('<$BINARY>')
+		let constructedURL =
+			new URL(source.includes('<$BINARY>')
 				? source.replaceAll('<$BINARY>', binary)
-				: source.endsWith('/') ? source + binary : source + '/' + binary;
+				: source.endsWith('/') ? source + binary : source + '/' + binary);
+		constructedURL.searchParams.set('nocache', Math.random());
+		constructedURL = constructedURL.href;
 		try {
 			const r = await fetch(constructedURL);
 			if (r.status !== 200)
