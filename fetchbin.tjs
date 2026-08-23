@@ -1,9 +1,13 @@
 import * as fs from 'fs';
 import * as path from 'path';
 
-const sources = [ // TODO: make this dynamic somehow
-	'https://raw.githubusercontent.com/sophb-chan/TaNDy-binaries/main',
-];
+async function fetchSources() {
+	const r = await fetch('https://raw.githubusercontent.com/sophb-chan/TaNDy-binaries/main/sources.json');
+	const text = await r.text();
+	const parsed = JSON.parse(text);
+	return parsed;
+}
+const sources = [];
 
 async function downloadBinary(binary) {
 	for (const [index, source] of sources.entries()) {
@@ -41,6 +45,8 @@ async function handle({
 		console.log("Usage: fetchbin <binary names>");
 		return;
 	}
+	console.log('Updating sources...');
+	sources.push(...(await fetchSources()));
 
 	const binaryNames = args.slice(1);
 	for (const binaryName of binaryNames) {
