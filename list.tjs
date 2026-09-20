@@ -12,44 +12,74 @@ function handle({
 		console.log("--file    (-F) - Only list files");
 		console.log("--dir     (-D) - Only list directories");
 		console.log("--symlink (-S) - Only list symbolic links");
+		console.log("--dont-skip-hidden (-d) - List files and directories that start with a period");
 		return;
 	}
 
+	const onlyDirs = flags.modifiers.includes('dir') || flags.modifiers.includes('D'),
+		onlyFiles = flags.modifiers.includes('file') || flags.modifiers.includes('F'),
+		onlySymlinks = flags.modifiers.includes('symlink') || flags.modifiers.includes('S'),
+		dontIgnoreHidden = flags.modifiers.includes('dont-skip-hidden') || flags.modifiers.includes('d');
 
-	const dir = args[1] ?? '.';
-	const list = fs.readdirSync(dir, { withFileTypes: true });
+	const dir = args[1] ?? '.', list = fs.readdirSync(dir, { withFileTypes: true });
+	const ESC = '\x1b', width = 16;
 
-	const ESC = '\x1b';
-	for (const entry of list) {
+	let outputText = '';
+	for (const [index, entry] of list.entries()) {
+		// Skip if the file is hidden (starts with a period) and the command is allowed to skip them
+		if (!dontIgnoreHidden && entry.name.startsWith('.')) continue;
+
+		let listString = '';
 		if (entry.isFile()) {
-			if (flags.modifiers.includes('dir') || flags.modifiers.includes('D')) continue;
-			if (flags.modifiers.includes('symlink') || flags.modifiers.includes('S')) continue;
+			// File handler
 
-			// file
+			// Skip if the command is only allowed to display directories or symbolic link
+			if (onlyDirs || onlySymlinks) continue;
+
 			const fullPath = path.join(dir, entry.name);
 			try {
+				// Check if the file is executable
 				fs.accessSync(fullPath, fs.constants.X_OK);
-				console.log(`${ESC}[32m${entry.name}${ESC}[0m`);
+				// Color the text green if the file is executable
+				listString = `${ESC}[32m${entry.name}${ESC}[0m`;
 			} catch {
-				console.log(entry.name);
+				// Display normally if the file is not executable
+				listString = entry.name;
 			}
 		} else if (entry.isDirectory()) {
-			if (flags.modifiers.includes('file') || flags.modifiers.includes('F')) continue;
-			if (flags.modifiers.includes('symlink') || flags.modifiers.includes('S')) continue;
+			// Directory handler
 
-			// dir
-			console.log(`${ESC}[93m${entry.name}${ESC}[0m`);
+			// Skip if the command is only allowed to display files or symbolic links
+			if (onlyFiles || onlySymlinks) continue;
+
+			// Style: bright yellow
+			listString = `${ESC}[93m${entry.name}${ESC}[0m`;
 		} else if (entry.isSymbolicLink()) {
-			if (flags.modifiers.includes('dir') || flags.modifiers.includes('D')) continue;
-			if (flags.modifiers.includes('file') || flags.modifiers.includes('F')) continue;
+			// Symlink handler
 
-			// symlink
-			console.log(`${ESC}[1;36m${entry.name}${ESC}[0m`);
+			// Skip if the command is only allowed to display directories or files
+			if (onlyDirs || onlyFiles) continue;
+
+			// Style: bold, cyan
+			listString = `${ESC}[1;36m${entry.name}${ESC}[0m`;
 		} else {
-			// unknown
-			console.log(`${ESC}[1;31m?? ${entry.name}${ESC}[0m`);
+			// Unknown file type handler
+
+			// Style: bold, red
+			listString = `${ESC}[1;31m?? ${entry.name}${ESC}[0m`;
 		}
+
+		// Append file string to final output
+		outputText += listString;
+		// Separate by newline if it exceeds the total allowed width otherwise
+		if ((index !== 0 && (index + 1) % width === 0) || width === 1) outputText += '\n';
+		// Separate by two spaces (for consistency with Linux's "ls") if it's still within the total allowed width
+		else if (index !== list.length - 1) outputText += '  ';
 	}
+
+	// Output the directory listing
+	console.log("\n\x1b[1;97mFiles:\x1b[0m\n");
+	console.log(outputText);
 }
 
 export default handle;

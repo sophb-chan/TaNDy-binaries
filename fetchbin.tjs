@@ -102,7 +102,8 @@ async function handle({
 			fs.writeFileSync(targetPath, binary);
 
 			console.log(`\nInstalled "${binaryName}"!`);
-		} catch {
+		} catch (err) {
+			console.debug(err);
 			console.log(`Binary "${binaryName}" not found in ${sources.length > 1 ? 'all ' : ''}${sources.length} source${sources.length === 1 ? '' : 's'}.`);
 		}
 	}

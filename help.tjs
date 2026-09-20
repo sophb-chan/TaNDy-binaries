@@ -1,6 +1,6 @@
 function handle({
 	binaries
-}) {
+} = {}) {
 	let listString = '';
 	const width = 8;
 
