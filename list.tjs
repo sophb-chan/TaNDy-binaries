@@ -22,14 +22,14 @@ function handle({
 		dontIgnoreHidden = flags.modifiers.includes('dont-skip-hidden') || flags.modifiers.includes('d');
 
 	const dir = args[1] ?? '.', list = fs.readdirSync(dir, { withFileTypes: true });
-	const ESC = '\x1b', width = 16;
+	const ESC = '\x1b', width = Infinity; // 16;
 
-	let outputText = '';
-	for (const [index, entry] of list.entries()) {
-		// Skip if the file is hidden (starts with a period) and the command is allowed to skip them
-		if (!dontIgnoreHidden && entry.name.startsWith('.')) continue;
-
-		let listString = '';
+	let outputText = '', lastLineLength = 0;
+	for (const [index, entry] of list.filter(
+		// Filter out
+		v => dontIgnoreHidden ? true : !v.name.startsWith('.')
+	).entries()) {
+		let listString;
 		if (entry.isFile()) {
 			// File handler
 
@@ -71,10 +71,23 @@ function handle({
 
 		// Append file string to final output
 		outputText += listString;
-		// Separate by newline if it exceeds the total allowed width otherwise
-		if ((index !== 0 && (index + 1) % width === 0) || width === 1) outputText += '\n';
+		// console.log(lastLineLength, '+', entry.name.length + 2, '=', lastLineLength + entry.name.length + 2, '- allowed total:', process.stdout.columns);
+		lastLineLength += listString.length;
+		if (
+			width === Infinity
+			? lastLineLength + entry.name.length + 2 > process.stdout.columns // Break line if it exceeds the terminal width
+			: (index !== 0 && (index + 1) % width === 0) || width === 1 // Break line if it exceeds max item count per line
+		) {
+			// Separate by newline if it exceeds the total allowed width otherwise
+			outputText += '\n';
+			lastLineLength = 0;
+			// console.log('Break!');
+		}
 		// Separate by two spaces (for consistency with Linux's "ls") if it's still within the total allowed width
-		else if (index !== list.length - 1) outputText += '  ';
+		else if (index !== list.length - 1) {
+			outputText += '  ';
+			lastLineLength += 2;
+		}
 	}
 
 	// Output the directory listing

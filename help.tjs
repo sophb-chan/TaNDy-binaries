@@ -2,12 +2,17 @@ function handle({
 	binaries
 } = {}) {
 	let listString = '';
-	const width = 8;
+	const width = Infinity; // 8;
 
-	for (const [index, binary] of binaries.entries()) {
-	    listString += binary;
-	    if ((index !== 0 && (index + 1) % width === 0) || width === 1) listString += '\n';
-	    else if (index !== binaries.length - 1) listString += ', ';
+	binaries.sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+	for (const [index, binary] of binaries.sort().entries()) {
+		listString += binary;
+		if (
+	   		width === Infinity
+			? listString.split('\n').at(-1).length + binary.length > process.stdout.columns // Break line if it exceeds the terminal's width
+			: (index !== 0 && (index + 1) % width === 0) || width === 1 // Break line if it exceeds the max item count per line
+		) listString += '\n';
+		else if (index !== binaries.length - 1) listString += ', ';
 	}
 
 	console.log("\n\x1b[1;97mCommands:\x1b[0m\n");

@@ -90,18 +90,20 @@ async function handle({
 						return answer;
 					}
 					const answer = await ask();
-					if (answer === 'i') continue;
-					else if (answer === 'd') fs.rmSync(absPath);
+					if (answer === 'i') {
+						console.log(`Skipping "${binaryName}".`);
+						continue;
+					} else if (answer === 'd') {
+						fs.rmSync(absPath);
+						const targetPath = path.join(binDir, binaryFilename);
+						console.log(`\nWriting to disk ("${targetPath}")...`);
+						fs.writeFileSync(targetPath, binary);
+						console.log(`\nInstalled "${binaryName}"!`);
+					}
 					else if (answer === 's') return;
 					else return; // Panic!
 				}
 			}
-
-			const targetPath = path.join(binDir, binaryFilename);
-			console.log(`\nWriting to disk ("${targetPath}")...`);
-			fs.writeFileSync(targetPath, binary);
-
-			console.log(`\nInstalled "${binaryName}"!`);
 		} catch (err) {
 			console.debug(err);
 			console.log(`Binary "${binaryName}" not found in ${sources.length > 1 ? 'all ' : ''}${sources.length} source${sources.length === 1 ? '' : 's'}.`);
