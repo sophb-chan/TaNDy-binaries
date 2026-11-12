@@ -7,10 +7,16 @@ function handle({
 		console.log(`Usage: ${args[0]} <bash command>`);
 		return;
 	}
-	const stdout = execSync(args.slice(1).join(' '), {
-		stdio: 'inherit',
-		encoding: 'utf-8',
-	});
+	try {
+		const stdout = execSync(args.slice(1).join(' '), {
+			stdio: 'inherit',
+			encoding: 'utf-8',
+		});
+	} catch (err) {
+		const exitCode = err.status;
+		return exitCode;
+	}
+	return 0;
 }
 
 export default handle;

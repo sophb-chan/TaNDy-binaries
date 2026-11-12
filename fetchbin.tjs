@@ -80,37 +80,39 @@ async function handle({
 			for (const extension of validBinExtensions) {
 				const absPath = path.join(binDir, binaryName + extension);
 				if (fs.existsSync(absPath)) {
-					console.log(`\nThere already is a binary named "${binaryName}" installed in your system ("under ${absPath}").`);
+					console.log(`\nThere already is a binary named "${binaryName}" currently installed in your system (under ${absPath}).`);
 					const ask = async () => {
-						const answer = (await rlInterface.question(`Do you want to (I)gnore it, (D)elete it, or (S)top here? (Default: S) `)).toLowerCase() || 's';
-						if (!'ids'.includes(answer)) {
+						const answer = (await rlInterface.question(`Do you want to s(K)ip installing "${binaryName}", (O)verwrite the existing installation, or (S)top here? (Default: S) `)).toLowerCase() || 's';
+						if (!'kos'.includes(answer)) {
 							console.log('Invalid answer.\n');
 							return await ask();
 						}
 						return answer;
 					}
 					const answer = await ask();
-					if (answer === 'i') {
+					if (answer === 'k') {
 						console.log(`Skipping "${binaryName}".`);
 						continue;
-					} else if (answer === 'd') {
+					} else if (answer === 'o') {
 						fs.rmSync(absPath);
 						const targetPath = path.join(binDir, binaryFilename);
 						console.log(`\nWriting to disk ("${targetPath}")...`);
 						fs.writeFileSync(targetPath, binary);
 						console.log(`\nInstalled "${binaryName}"!`);
 					}
-					else if (answer === 's') return;
-					else return; // Panic!
+					else if (answer === 's') {
+						console.log('Stopped. No further modifications have been done to your system.');
+						return;
+					} else return; // Panic!
 				}
 			}
+			console.log('Reloading binaries...');
+			reloadBinaries();
 		} catch (err) {
-			console.debug(err);
+			// console.debug(err);
 			console.log(`Binary "${binaryName}" not found in ${sources.length > 1 ? 'all ' : ''}${sources.length} source${sources.length === 1 ? '' : 's'}.`);
 		}
 	}
-	console.log('Reloading binaries...');
-	reloadBinaries();
 }
 
 export default handle;

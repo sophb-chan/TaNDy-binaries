@@ -5,7 +5,7 @@ function handle({
 	args,
 	flags
 } = {}) {
-	if (flags.modifiers.includes('h') || flags.modifiers.includes('help')) {
+	if (flags.modifiers.h || flags.modifiers.help) {
 		console.log("Usage: list [target directory]\n");
 		console.log("=== Flags ===");
 		console.log("--help    (-h) - Shows this");
@@ -16,12 +16,15 @@ function handle({
 		return;
 	}
 
-	const onlyDirs = flags.modifiers.includes('dir') || flags.modifiers.includes('D'),
-		onlyFiles = flags.modifiers.includes('file') || flags.modifiers.includes('F'),
-		onlySymlinks = flags.modifiers.includes('symlink') || flags.modifiers.includes('S'),
-		dontIgnoreHidden = flags.modifiers.includes('dont-skip-hidden') || flags.modifiers.includes('d');
+	const onlyDirs = flags.modifiers.dir || flags.modifiers.D,
+		onlyFiles = flags.modifiers.file || flags.modifiers.F,
+		onlySymlinks = flags.modifiers.symlink || flags.modifiers.S,
+		dontIgnoreHidden = flags.modifiers['dont-skip-hidden'] || flags.modifiers.d;
 
 	const dir = args[1] ?? '.', list = fs.readdirSync(dir, { withFileTypes: true });
+	if (list.length === 0)
+		console.log('\x1B[2;3m(empty)\x1B[0m');
+
 	const ESC = '\x1b', width = Infinity; // 16;
 
 	let outputText = '', lastLineLength = 0;

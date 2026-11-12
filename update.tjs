@@ -1,80 +1,127 @@
 import * as fs from 'fs';
 import * as path from 'path';
 
-async function fetchFromRemote(filepath) {
+async function fetchFromRemote(filePath) {
 	const remoteSrc = 'https://raw.githubusercontent.com/sophb-chan/TaNDy/main/';
-	const r = await fetch(remoteSrc + filepath);
-	if (r.status !== 200) throw r.status;
+	const remoteURL = new URL(remoteSrc);
+	remoteURL.pathname = path.join(remoteURL.pathname, filePath);
+	const r = await fetch(remoteURL.toString());
+	if (r.status !== 200) throw new Error(`Got HTTP status code ${r.status} while fetching ${filePath} from remote.`);
 	return await r.text();
+}
+function compareSemver(semverA, semverB) {
+	// 0 → Semvers are equal
+	// -1 → Semver B is greater than Semver A
+	// 1 → Semver A is greater than Semver B
+	// Anything else → You fucked up
+
+	const eraseRegex = /^v|-[0-9a-z-]+$/i;
+	const partsA = semverA.replace(eraseRegex, '').split('.').map(v => parseInt(v)),
+		partsB = semverB.replace(eraseRegex, '').split('.').map(v => parseInt(v));
+
+	for (let i = 0; i < 3; i++) {
+		const numA = partsA[i] || 0, numB = partsB[i] || 0;
+		if (numA > numB) return 1;
+		if (numA < numB) return -1;
+	}
+	return 0;
 }
 async function handle({
 	tandyDir,
-	flagsObj,
+	tandyVer,
 	rlInterface,
+	flags,
 } = {}) {
-	// Conversion table between local and remote filenames
-	const nametable = {
-		'term.js': 'term.js',
-		'minimist-string.js': 'minimist-string.js',
-		'tandy': 'tandy.js',
+	const fileInfo = {
+		'term.js': {
+			remoteName: 'term.js',
+			needsRestart: true,
+		},
+		'minimist-string.js': {
+			remoteName: 'minimist-string.js',
+			needsRestart: true,
+		},
+		'tandy': {
+			remoteName: 'tandy.js',
+			needsRestart: true,
+		},
+		'taskmgr.js': {
+			remoteName: 'taskmgr.js',
+			needsRestart: true,
+		},
+		'package.json': {
+			remoteName: 'package.json',
+		},
 	};
+	const breakingChanges = await fetchFromRemote('docs/BREAKING_CHANGES.md');
+	const packageText = await fetchFromRemote('package.json'),
+		packageObject = JSON.parse(packageText),
+		remoteVersion = packageObject.version;
 
-	// Contents of remotely-stored files
-	const remoteContents = {};
-	// List files that need to be updated
-	const needsUpdate = {};
-	for (const [localName, remoteName] of Object.entries(nametable)) {
-		console.log(`Checking '${localName}'...`);
-		const localContent = fs.readFileSync(path.join(tandyDir, localName), { encoding: 'utf-8' });
-		try {
-			const remoteContent = await fetchFromRemote(remoteName);
-			remoteContents[remoteName] = remoteContent;
-			const upToDate = localContent === remoteContent;
-			needsUpdate[localName] = !upToDate;
-		} catch (err) {
-			if (err?.message)
-				console.error(`Error when checking '${localName}' - ${err.name}: ${err.message}`);
-			else if (Number.isInteger(err))
-				console.error(`Error when checking '${localName}' - Got HTTP status code ${err}.`);
-			else
-				console.error(`Error when checking '${localName}' - RawThrow: ${JSON.stringify(err)}`);
-			console.warn('Assuming up-to-date; continuing without fetch.');
-			needsUpdate[localName] = false;
-		}
-	}
-
-	// Update files that need to be updated
-	if (!Object.values(needsUpdate).some(Boolean)) {
-		console.log('Your installation of TaNDy is already up-to-date.');
+	const remoteSemverComparison = compareSemver(remoteVersion, tandyVer);
+	if (remoteSemverComparison !== 1) {
+		console.log('Your installation of TaNDy is up to date.');
+		if (remoteSemverComparison === -1)
+			console.log("\x1B[2;3;96m(You're an early bird!)\x1B[0m");
 		return;
 	}
-	if (!(flagsObj.y || flagsObj['assume-yes'])) {
-		let updateStr = '';
-		const outdated = Object.entries(needsUpdate).filter(v => v[1]).map(v => v[0]);
-		for (const [index, pkg] of outdated.entries()) {
-			updateStr += pkg;
-			if (index === outdated.length - 1) updateStr += '';
-			else if (index === outdated.length - 2) updateStr += ' and ';
-			else updateStr += ', ';
+
+	const includesBreakingChanges = (() => {
+		const lineRegex = /^##\s*(v?\d+\.\d+\.\d+(?:-[0-9a-z-]+)?) -> (v?\d+\.\d+\.\d+(?:-[0-9a-z-]+)?)\s*$/i;
+		const lines = breakingChanges.split(/\r?\n|\r/), breakLines = lines.filter(l => lineRegex.test(l));
+
+		const changeChain = [tandyVer];
+		for (const breakLine of breakLines) {
+			const [oldVer, newVer] = [...lineRegex.exec(breakLine)].slice(1);
+			if (compareSemver(oldVer, changeChain.at(-1)) === 0)
+				changeChain.push(newVer);
+			if (compareSemver(newVer, remoteVersion) === 0) break;
 		}
-		const ask = async () => {
-			const answer = (await rlInterface.question(`${updateStr} need${outdated.length === 1 ? 's' : ''} to update. Proceed? [Y/n] `)).toLowerCase() || 'y';
-			if (!'yn'.includes(answer)) {
-				console.log('Invalid response.');
-				return await ask();
-			}
-			return answer;
-		};
-		const proceed = await ask() === 'y';
-		if (!proceed) return;
+		return changeChain.length > 1;
+	})();
+
+	console.log(`Your installation of TaNDy is out of date! (Local: ${tandyVer} / Remote: ${remoteVersion})`);
+	if (includesBreakingChanges)
+		console.warn(`Updating TaNDy may cause some binaries to break, and not all binaries are guaranteed to have an updated version.`);
+	if (!flags.modifiers.y) {
+		while (true) {
+			const proceed = (
+				await rlInterface.question('Do you want to proceed with an update? [y/N] ')
+			).toLowerCase() || 'n';
+			const isValidAnswer = /^(?:y(?:es)?|no?)?$/i.test(proceed);
+
+			if (isValidAnswer) {
+				const wantsToProceed = /^y(?:es)?$/i.test(proceed);
+
+				if (wantsToProceed) break;
+				else throw 'Update aborted.';
+			} else console.error('Invalid answer.');
+		}
 	}
-	for (const [localName, isOutdated] of Object.entries(needsUpdate)) {
-		if (!isOutdated) continue;
+
+	let restartNeeded = false;
+	const changed = [];
+	for (const [localName, info] of Object.entries(fileInfo)) {
+		const { remoteName, needsRestart } = info;
+		console.log(`Checking '${localName}'...`);
+		const localPath = path.join(tandyDir, localName);
+		const remoteContent = await fetchFromRemote(remoteName);
+		const localContent = fs.readFileSync(localPath, { encoding: 'utf-8' });
+		if (remoteContent === localContent) {
+			console.log(`No need to update '${localName}', no changes have been made.`);
+			continue;
+		}
+		restartNeeded ||= needsRestart ?? false;
+		changed.push(localName);
 		console.log(`Updating '${localName}'...`);
-		const newContent = remoteContents[nametable[localName]];
-		fs.writeFileSync(path.join(tandyDir, localName), newContent);
+		fs.writeFileSync(localPath, remoteContent);
+		console.log(`Updated '${localName}'.`);
 	}
-	console.log("Updated successfully!");
+	if (changed.length > 0) {
+		console.log(`TaNDy has been updated to v${remoteVersion}!`);
+		if (restartNeeded)
+			console.log('Please restart TaNDy to apply all changes.');
+	}
 }
 
 export default handle;
